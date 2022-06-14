@@ -1,0 +1,11 @@
+Hi,
+New order was created:
+
+Order Code: $order_code
+Order Description: $order_description
+Customer: $customer_name
+Created at: $order_created_at
+
+$order_items
+
+Total Price: $order_total_price
