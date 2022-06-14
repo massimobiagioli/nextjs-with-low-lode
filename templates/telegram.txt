@@ -1,0 +1,4 @@
+Hi,
+New order was created:
+Code: $code
+    

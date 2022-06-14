@@ -1,0 +1,386 @@
+{
+  "name": "Demo - Process Order",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "/process-order",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        420
+      ],
+      "webhookId": "004e89ad-7919-461a-9e76-597b94d5de3b",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "5",
+          "name": "Header Authentication"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "application": "app87nSLKnDendQbB",
+        "table": "tblg7OSlLnHrQIIRs",
+        "addAllFields": "={{true}}",
+        "options": {}
+      },
+      "name": "AirTable - Insert Order",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        180,
+        300
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "6",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "code",
+              "value": "={{$json[\"body\"][\"orderCode\"]}}"
+            },
+            {
+              "name": "description",
+              "value": "={{$json[\"body\"][\"description\"]}}"
+            },
+            {
+              "name": "customer_code",
+              "value": "={{$json[\"body\"][\"customerCode\"]}}"
+            },
+            {
+              "name": "status",
+              "value": "created"
+            },
+            {
+              "name": "created_at",
+              "value": "={{new Date().toISOString()}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Set Order Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "application": "app87nSLKnDendQbB",
+        "table": "tbltrjL308KqA2Ubm",
+        "addAllFields": "={{true}}",
+        "options": {}
+      },
+      "name": "AirTable - Insert OrderItems",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [
+        180,
+        540
+      ],
+      "credentials": {
+        "airtableApi": {
+          "id": "6",
+          "name": "Airtable account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const orderCode = items[0].json.body.orderCode\n\nreturn items[0].json.body.orderItems.map(orderItem => ({\n  ...orderItem,\n  order_code: orderCode\n}))"
+      },
+      "name": "Set OrderItems Payload",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        540
+      ]
+    },
+    {
+      "parameters": {},
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "position": [
+        440,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return {\n  \"order\": items[0].json,\n  \"orderDetail\": items.slice(1).map(item => item.json)\n}"
+      },
+      "name": "Transform Order Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        640,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "let template = items[0].json.data\nconst orderCode = $item(0).$node[\"Transform Order Data\"].json.order.fields.code\n\ntemplate = template.replace('$code', orderCode)\n\nreturn { template }"
+      },
+      "name": "Transform Email Template",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://flw-low-code-demo.s3.eu-central-1.amazonaws.com/templates/default.html",
+        "responseFormat": "string",
+        "options": {}
+      },
+      "name": "Get Email Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://flw-low-code-demo.s3.eu-central-1.amazonaws.com/templates/telegram.txt",
+        "responseFormat": "string",
+        "options": {}
+      },
+      "name": "Get Telegram Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        880,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "let template = items[0].json.data\nconst orderCode = $item(0).$node[\"Transform Order Data\"].json.order.fields.code\n\ntemplate = template.replace('$code', orderCode)\n\nreturn { template }"
+      },
+      "name": "Transform Telegram Template",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "orders@demo.dev",
+        "toEmail": "massimo.biagioli@flowing.it",
+        "subject": "New Order Created",
+        "html": "={{$json[\"template\"]}}",
+        "options": {
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "8",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "457673322",
+        "text": "={{$json[\"template\"]}}",
+        "additionalFields": {}
+      },
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        540
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "9",
+          "name": "demo_orders"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Set Order Payload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Set OrderItems Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Order Payload": {
+      "main": [
+        [
+          {
+            "node": "AirTable - Insert Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set OrderItems Payload": {
+      "main": [
+        [
+          {
+            "node": "AirTable - Insert OrderItems",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AirTable - Insert OrderItems": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "AirTable - Insert Order": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Transform Order Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Order Data": {
+      "main": [
+        [
+          {
+            "node": "Get Email Template",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Telegram Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Email Template": {
+      "main": [
+        [
+          {
+            "node": "Transform Email Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Telegram Template": {
+      "main": [
+        [
+          {
+            "node": "Transform Telegram Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Email Template": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform Telegram Template": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "id": 9
+}
